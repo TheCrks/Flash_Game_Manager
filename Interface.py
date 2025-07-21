@@ -5,6 +5,7 @@ import re
 import time
 import subprocess
 import os
+import platform
 import pandas as pd
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTableView, QVBoxLayout, QWidget,
@@ -290,22 +291,36 @@ class MainWindow(QMainWindow):
             print("Error: 'Filename' column is missing.")
             return
 
-        # Retrieve the filename
         try:
             filename = self.data.loc[self.data["Name"] == game_name, "Filename"].values[0]
-            if filename:
-                # Check the file extension and decide which program to use
-                if filename.endswith(".exe"):
-                    # Run .exe files directly on Windows
-                    subprocess.Popen(["wine", filename])
-                elif filename.endswith(".swf"):
-                    # Run with Flash Player for .swf files (ensure flashplayer is installed)
-                    subprocess.Popen(["wine", 'Open With/flashplayer_11_sa.exe', filename])
-                else:
-                    # For any other file types, try opening with the default application
-                    subprocess.Popen(['start', '', filename], shell=True)
-            else:
+            if not filename:
                 print(f"No executable filename found for {game_name}.")
+                return
+
+            # Normalize path
+            filename = os.path.abspath(filename)
+
+            # Determine OS
+            is_windows = platform.system() == "Windows"
+
+            if filename.endswith(".exe"):
+                if is_windows:
+                    subprocess.Popen([filename], shell=True)
+                else:
+                    subprocess.Popen(["wine", filename])
+            elif filename.endswith(".swf"):
+                flash_player_path = os.path.abspath("Open With/flashplayer_11_sa.exe")
+                if is_windows:
+                    subprocess.Popen([flash_player_path, filename], shell=True)
+                else:
+                    subprocess.Popen(["wine", flash_player_path, filename])
+            else:
+                # Open with default application
+                if is_windows:
+                    os.startfile(filename)
+                else:  # Linux
+                    subprocess.Popen(["xdg-open", filename])
+
         except IndexError:
             print(f"Error: No matching record found for {game_name}.")
 
