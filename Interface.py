@@ -377,23 +377,36 @@ class MainWindow(QMainWindow):
 
 
     def filter_existing_files(self, df):
-        return df[df["Filename"].apply(lambda f: os.path.isfile(os.path.join(os.path.dirname(__file__), f)))]
+        base_path = os.path.dirname(__file__)
+        existing_mask = df["Filename"].apply(lambda f: os.path.isfile(os.path.join(base_path, f)))
+
+        # Print excluded rows (files that don't exist)
+        excluded = df[~existing_mask]
+        if not excluded.empty:
+            print("Excluded lines (file not found):")
+            print(excluded.to_string(index=False))
+
+        return df[existing_mask]
 
 
     def load_data(self, file_path, encoding="utf-8"):
             self.favorites_set = {self.normalize_turkish(fav) for fav in self.favorites}
             data = []
+            line_num = 0
             try:
                 with open(file_path, "r", encoding=encoding) as file:
                     for line in file:
+                        line_num += 1
                         match = re.match(
-                            r"name: (.*?), categories: (.*?), source: (.*?), filename: (.*)", line.strip()
+                            r"name:(.*?), categories:(.*?), source:(.*?), filename: (.*)", line.strip()
                         )
                         if match:
                             name, categories, source, filename = match.groups()
                             categories = categories.replace("'", "").replace("[", "").replace("]", "")
                             source = source.strip() if source.strip() else "unknown"
                             data.append([name.strip(), categories.strip(), source, filename.strip(), False])
+                        else:
+                            print(f"Line {line_num} ignored (no regex match): {line.strip()}")
             except FileNotFoundError:
                 print(f"Error: The file '{file_path}' was not found.")
                 return pd.DataFrame()  # Return an empty DataFrame if the file is not found.
